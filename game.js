@@ -5,6 +5,11 @@ const GRID_WIDTH = 11;
 const GRID_HEIGHT = 9;
 const PLAYER_START = { x: 1, y: 4 };
 const EXIT_POSITION = { x: 9, y: 4 };
+const PLAYER_MOVE_INTERVAL = 145;
+const ENEMY_TICK_INTERVAL = 430;
+const PLAYER_ATTACK_COOLDOWN = 330;
+const ENEMY_ATTACK_COOLDOWN = 900;
+const RESPAWN_DELAY = 550;
 
 const directions = {
   up: { x: 0, y: -1 },
@@ -12,6 +17,8 @@ const directions = {
   left: { x: -1, y: 0 },
   right: { x: 1, y: 0 }
 };
+
+const directionNames = Object.keys(directions);
 
 const elements = {
   grid: document.querySelector("#gameGrid"),
@@ -78,7 +85,13 @@ let walls = new Set();
 let enemies = [];
 let swordCell = null;
 let nextEnemyId = 1;
-let messageText = "Move with the arrows. Face a monster and press Attack.";
+let messageText = "Real-time mode: hold a direction to move. Face a monster and attack.";
+let nextPlayerMoveAt = 0;
+let nextPlayerAttackAt = 0;
+let attackButtonTimer = null;
+let playerDefeated = false;
+let transitioningZone = false;
+const directionInputs = new Map();
 
 const player = {
   x: PLAYER_START.x,
@@ -209,7 +222,8 @@ function createNormalEnemy(position) {
     maxHp,
     attack: 1 + Math.floor((save.zone - 1) / 2) + (tier - 1),
     crystals: Math.max(1, Math.floor((save.zone + tier) / 2)),
-    boss: false
+    boss: false,
+    nextAttackAt: performance.now() + 650
   };
 }
 
@@ -226,7 +240,8 @@ function createGuardian(position) {
     maxHp,
     attack: 2 + Math.floor(save.zone / 2),
     crystals: 7 + save.zone * 3,
-    boss: true
+    boss: true,
+    nextAttackAt: performance.now() + 800
   };
 }
 
@@ -254,6 +269,7 @@ function spawnGuardian() {
 }
 
 function buildZone() {
+  stopAllDirections();
   walls = getWallsForZone(save.zone);
   enemies = [];
   swordCell = null;
@@ -261,6 +277,10 @@ function buildZone() {
   player.y = PLAYER_START.y;
   player.hp = getMaxHp();
   player.facing = "right";
+  playerDefeated = false;
+  transitioningZone = false;
+  nextPlayerMoveAt = 0;
+  nextPlayerAttackAt = 0;
 
   const progress = getZoneProgress();
   const requirement = getGateRequirement();
@@ -275,7 +295,7 @@ function buildZone() {
   } else if (progress.guardianDefeated) {
     setMessage(`Zone ${save.zone} is cleared. Reach [>] to enter Zone ${save.zone + 1}.`);
   } else {
-    setMessage(`Defeat ${requirement - progress.kills} more monster${requirement - progress.kills === 1 ? "" : "s"} to summon the guardian.`);
+    setMessage(`Real-time mode. Defeat ${requirement - progress.kills} more monster${requirement - progress.kills === 1 ? "" : "s"} to summon the guardian.`);
   }
 
   saveGame(false);
@@ -297,9 +317,54 @@ function setMessage(text) {
   messageText = text;
 }
 
-function movePlayer(directionName) {
+function activeDirection() {
+  const values = [...directionInputs.values()];
+  return values.length ? values[values.length - 1] : null;
+}
+
+function pressDirection(token, directionName) {
+  if (!directions[directionName] || playerDefeated || transitioningZone) return;
+  directionInputs.delete(token);
+  directionInputs.set(token, directionName);
+  updatePressedButtons();
+
+  const now = performance.now();
+  movePlayerStep(directionName);
+  nextPlayerMoveAt = now + PLAYER_MOVE_INTERVAL;
+}
+
+function releaseDirection(token) {
+  directionInputs.delete(token);
+  updatePressedButtons();
+}
+
+function stopAllDirections() {
+  directionInputs.clear();
+  updatePressedButtons();
+}
+
+function updatePressedButtons() {
+  const held = new Set(directionInputs.values());
+  for (const button of document.querySelectorAll(".move-button")) {
+    button.classList.toggle("pressed", held.has(button.dataset.direction));
+  }
+}
+
+function processHeldMovement() {
+  if (document.hidden || playerDefeated || transitioningZone) return;
+  const directionName = activeDirection();
+  if (!directionName) return;
+
+  const now = performance.now();
+  if (now < nextPlayerMoveAt) return;
+
+  movePlayerStep(directionName);
+  nextPlayerMoveAt = now + PLAYER_MOVE_INTERVAL;
+}
+
+function movePlayerStep(directionName) {
   const direction = directions[directionName];
-  if (!direction) return;
+  if (!direction || playerDefeated || transitioningZone) return;
 
   player.facing = directionName;
   const targetX = player.x + direction.x;
@@ -313,7 +378,7 @@ function movePlayer(directionName) {
 
   const blockingEnemy = enemyAt(targetX, targetY);
   if (blockingEnemy) {
-    setMessage(`Enemy [${blockingEnemy.symbol}] blocks the way. Press Attack.`);
+    setMessage(`Enemy [${blockingEnemy.symbol}] blocks the way. Attack or move around it.`);
     render();
     return;
   }
@@ -327,11 +392,17 @@ function movePlayer(directionName) {
     return;
   }
 
-  enemyTurn();
   render();
 }
 
 function attack() {
+  if (playerDefeated || transitioningZone) return;
+
+  const now = performance.now();
+  if (now < nextPlayerAttackAt) return;
+  nextPlayerAttackAt = now + PLAYER_ATTACK_COOLDOWN;
+  updateAttackButton();
+
   const direction = directions[player.facing];
   const targetX = player.x + direction.x;
   const targetY = player.y + direction.y;
@@ -340,31 +411,42 @@ function attack() {
   const target = enemyAt(targetX, targetY);
   if (!target) {
     setMessage("Your sword hits nothing.");
-    enemyTurn();
-    render();
-    clearSwordSoon();
-    return;
-  }
-
-  const damage = getAttack();
-  target.hp -= damage;
-
-  if (target.hp <= 0) {
-    defeatEnemy(target);
   } else {
-    setMessage(`You hit [${target.symbol}] for ${damage}. HP: ${target.hp}/${target.maxHp}.`);
+    const damage = getAttack();
+    target.hp -= damage;
+
+    if (target.hp <= 0) {
+      defeatEnemy(target);
+    } else {
+      setMessage(`You hit [${target.symbol}] for ${damage}. HP: ${target.hp}/${target.maxHp}.`);
+    }
   }
 
-  if (player.hp > 0) enemyTurn();
   render();
   clearSwordSoon();
+}
+
+function updateAttackButton() {
+  if (attackButtonTimer !== null) {
+    window.clearTimeout(attackButtonTimer);
+    attackButtonTimer = null;
+  }
+
+  const remaining = Math.max(0, nextPlayerAttackAt - performance.now());
+  const coolingDown = remaining > 0;
+  elements.attackButton.disabled = coolingDown || playerDefeated || transitioningZone;
+  elements.attackButton.textContent = coolingDown ? "🗡️ ..." : "🗡️ Attack";
+
+  if (coolingDown) {
+    attackButtonTimer = window.setTimeout(updateAttackButton, remaining + 8);
+  }
 }
 
 function clearSwordSoon() {
   window.setTimeout(() => {
     swordCell = null;
     render();
-  }, 140);
+  }, 125);
 }
 
 function defeatEnemy(enemy) {
@@ -392,75 +474,99 @@ function defeatEnemy(enemy) {
   saveGame(false);
 }
 
-function enemyTurn() {
+function enemyTick() {
+  if (document.hidden || playerDefeated || transitioningZone) return;
+
+  const now = performance.now();
   const shuffled = [...enemies].sort(() => Math.random() - 0.5);
 
   for (const enemy of shuffled) {
-    if (player.hp <= 0) break;
+    if (playerDefeated) break;
+    if (!enemies.includes(enemy)) continue;
 
     const distance = Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y);
     if (distance === 1) {
-      enemyAttack(enemy);
+      if (now >= enemy.nextAttackAt) {
+        enemyAttack(enemy, now);
+      }
       continue;
     }
 
     moveEnemyTowardPlayer(enemy);
-
-    const newDistance = Math.abs(enemy.x - player.x) + Math.abs(enemy.y - player.y);
-    if (newDistance === 1 && enemy.boss) {
-      setMessage("The guardian closes in.");
-    }
   }
+
+  render();
 }
 
-function enemyAttack(enemy) {
+function enemyAttack(enemy, now) {
+  enemy.nextAttackAt = now + ENEMY_ATTACK_COOLDOWN;
   const damage = Math.max(1, enemy.attack - getDefense());
   player.hp -= damage;
   setMessage(`[${enemy.symbol}] hits you for ${damage}.`);
 
   if (player.hp <= 0) {
-    player.hp = 0;
-    render();
-    window.setTimeout(respawnPlayer, 220);
+    beginRespawn();
   }
+}
+
+function beginRespawn() {
+  if (playerDefeated) return;
+  playerDefeated = true;
+  player.hp = 0;
+  stopAllDirections();
+  setMessage("You were defeated. Respawning—nothing permanent is lost.");
+  updateAttackButton();
+  render();
+  window.setTimeout(buildZone, RESPAWN_DELAY);
+}
+
+function shuffledDirections() {
+  return [...directionNames].sort(() => Math.random() - 0.5);
+}
+
+function findNextEnemyStep(enemy) {
+  const queue = [{ x: enemy.x, y: enemy.y, first: null }];
+  const visited = new Set([cellKey(enemy.x, enemy.y)]);
+
+  while (queue.length) {
+    const current = queue.shift();
+
+    for (const directionName of shuffledDirections()) {
+      const direction = directions[directionName];
+      const nextX = current.x + direction.x;
+      const nextY = current.y + direction.y;
+      const key = cellKey(nextX, nextY);
+
+      if (!isInside(nextX, nextY) || visited.has(key) || walls.has(key)) continue;
+
+      const isPlayerCell = nextX === player.x && nextY === player.y;
+      if (!isPlayerCell && isOccupied(nextX, nextY, enemy.id)) continue;
+
+      const first = current.first || { x: nextX, y: nextY };
+      if (isPlayerCell) return first;
+
+      visited.add(key);
+      queue.push({ x: nextX, y: nextY, first });
+    }
+  }
+
+  return null;
 }
 
 function moveEnemyTowardPlayer(enemy) {
-  const horizontal = {
-    x: Math.sign(player.x - enemy.x),
-    y: 0
-  };
-  const vertical = {
-    x: 0,
-    y: Math.sign(player.y - enemy.y)
-  };
+  const step = findNextEnemyStep(enemy);
+  if (!step) return;
+  if (step.x === player.x && step.y === player.y) return;
+  if (isOccupied(step.x, step.y, enemy.id)) return;
 
-  const candidates = Math.random() < 0.5
-    ? [horizontal, vertical]
-    : [vertical, horizontal];
-
-  for (const direction of candidates) {
-    if (direction.x === 0 && direction.y === 0) continue;
-
-    const targetX = enemy.x + direction.x;
-    const targetY = enemy.y + direction.y;
-
-    if (!isInside(targetX, targetY)) continue;
-    if (walls.has(cellKey(targetX, targetY))) continue;
-    if (isOccupied(targetX, targetY, enemy.id)) continue;
-
-    enemy.x = targetX;
-    enemy.y = targetY;
-    return;
-  }
-}
-
-function respawnPlayer() {
-  setMessage("You were defeated. Nothing permanent was lost.");
-  buildZone();
+  enemy.x = step.x;
+  enemy.y = step.y;
 }
 
 function enterNextZone() {
+  if (transitioningZone) return;
+  transitioningZone = true;
+  stopAllDirections();
   save.zone += 1;
   save.maxZone = Math.max(save.maxZone, save.zone);
   getZoneProgress();
@@ -470,7 +576,7 @@ function enterNextZone() {
 }
 
 function buyUpgrade(type) {
-  if (!Object.hasOwn(save.upgrades, type)) return;
+  if (!Object.prototype.hasOwnProperty.call(save.upgrades, type)) return;
 
   const cost = getUpgradeCost(type);
   if (save.crystals < cost) {
@@ -507,7 +613,7 @@ function render() {
   const requirement = getGateRequirement();
   const guardianAlive = enemies.some((enemy) => enemy.boss);
 
-  elements.zoneLabel.textContent = `Zone ${save.zone} · Highest ${save.maxZone}`;
+  elements.zoneLabel.textContent = `Zone ${save.zone} · LIVE · Highest ${save.maxZone}`;
   elements.hpStat.textContent = `${Math.max(0, player.hp)} / ${getMaxHp()}`;
   elements.attackStat.textContent = String(getAttack());
   elements.defenseStat.textContent = String(getDefense());
@@ -530,6 +636,7 @@ function render() {
 
   renderUpgrades();
   renderGrid(progress.guardianDefeated);
+  updateAttackButton();
 }
 
 function renderUpgrades() {
@@ -592,9 +699,8 @@ function renderGrid(exitOpen) {
   elements.grid.replaceChildren(fragment);
 }
 
-function handleKeydown(event) {
-  const key = event.key.toLowerCase();
-  const keyDirections = {
+function keyDirection(key) {
+  return {
     arrowup: "up",
     w: "up",
     arrowdown: "down",
@@ -603,11 +709,19 @@ function handleKeydown(event) {
     a: "left",
     arrowright: "right",
     d: "right"
-  };
+  }[key] || null;
+}
 
-  if (keyDirections[key]) {
+function handleKeydown(event) {
+  const key = event.key.toLowerCase();
+  const directionName = keyDirection(key);
+
+  if (directionName) {
     event.preventDefault();
-    movePlayer(keyDirections[key]);
+    const token = `key:${key}`;
+    if (!directionInputs.has(token)) {
+      pressDirection(token, directionName);
+    }
     return;
   }
 
@@ -617,11 +731,34 @@ function handleKeydown(event) {
   }
 }
 
-for (const button of document.querySelectorAll(".move-button")) {
-  button.addEventListener("click", () => movePlayer(button.dataset.direction));
+function handleKeyup(event) {
+  const key = event.key.toLowerCase();
+  if (!keyDirection(key)) return;
+  event.preventDefault();
+  releaseDirection(`key:${key}`);
 }
 
-elements.attackButton.addEventListener("click", attack);
+for (const button of document.querySelectorAll(".move-button")) {
+  button.addEventListener("pointerdown", (event) => {
+    event.preventDefault();
+    button.setPointerCapture?.(event.pointerId);
+    pressDirection(`pointer:${event.pointerId}`, button.dataset.direction);
+  });
+
+  const releasePointer = (event) => {
+    releaseDirection(`pointer:${event.pointerId}`);
+  };
+
+  button.addEventListener("pointerup", releasePointer);
+  button.addEventListener("pointercancel", releasePointer);
+  button.addEventListener("lostpointercapture", releasePointer);
+  button.addEventListener("contextmenu", (event) => event.preventDefault());
+}
+
+elements.attackButton.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  attack();
+});
 elements.saveButton.addEventListener("click", () => saveGame(true));
 elements.resetButton.addEventListener("click", resetSave);
 
@@ -630,6 +767,17 @@ for (const button of elements.upgradeButtons) {
 }
 
 document.addEventListener("keydown", handleKeydown);
+document.addEventListener("keyup", handleKeyup);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopAllDirections();
+    saveGame(false);
+  }
+});
+window.addEventListener("blur", stopAllDirections);
 window.addEventListener("pagehide", () => saveGame(false));
+
+window.setInterval(processHeldMovement, 35);
+window.setInterval(enemyTick, ENEMY_TICK_INTERVAL);
 
 buildZone();
