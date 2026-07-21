@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <title>WhaleLand</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <h1>WhaleLand</h1>
+        <p id="zoneLabel">Zone 1</p>
+      </div>
+      <button id="saveButton" class="small-button" type="button">Save</button>
+    </header>
+
+    <section class="stats" aria-label="Player stats">
+      <div><span>HP</span><strong id="hpStat">20 / 20</strong></div>
+      <div><span>ATK</span><strong id="attackStat">2</strong></div>
+      <div><span>DEF</span><strong id="defenseStat">0</strong></div>
+      <div><span>Crystals</span><strong id="crystalStat">0</strong></div>
+    </section>
+
+    <section class="progress-panel">
+      <div class="progress-row">
+        <span id="gateText">Gate charge: 0 / 6</span>
+        <span id="goalText">Defeat monsters</span>
+      </div>
+      <div class="progress-track" aria-hidden="true">
+        <div id="gateBar" class="progress-fill"></div>
+      </div>
+    </section>
+
+    <section class="game-wrap" aria-label="Game area">
+      <div id="gameGrid" class="game-grid" role="grid" aria-label="WhaleLand game map"></div>
+    </section>
+
+    <section class="message-panel" aria-live="polite">
+      <p id="message">Move with the arrows. Face a monster and press Attack.</p>
+    </section>
+
+    <section class="controls" aria-label="Game controls">
+      <div class="dpad">
+        <button class="move-button up" data-direction="up" type="button" aria-label="Move up">▲</button>
+        <button class="move-button left" data-direction="left" type="button" aria-label="Move left">◀</button>
+        <button class="move-button down" data-direction="down" type="button" aria-label="Move down">▼</button>
+        <button class="move-button right" data-direction="right" type="button" aria-label="Move right">▶</button>
+      </div>
+      <button id="attackButton" class="attack-button" type="button">🗡️ Attack</button>
+    </section>
+
+    <section class="upgrade-panel">
+      <h2>Permanent Crystal Upgrades</h2>
+      <div class="upgrade-grid">
+        <button class="upgrade-button" data-upgrade="attack" type="button">
+          <span>Damage</span>
+          <strong id="attackUpgradeText">Level 0 · Cost 5</strong>
+        </button>
+        <button class="upgrade-button" data-upgrade="health" type="button">
+          <span>Health</span>
+          <strong id="healthUpgradeText">Level 0 · Cost 5</strong>
+        </button>
+        <button class="upgrade-button" data-upgrade="defense" type="button">
+          <span>Defense</span>
+          <strong id="defenseUpgradeText">Level 0 · Cost 5</strong>
+        </button>
+      </div>
+    </section>
+
+    <details class="help-panel">
+      <summary>Controls and symbols</summary>
+      <p><code>[A]</code> is you. <code>[1]</code>, <code>[2]</code>, and <code>[3]</code> are monsters. <code>[B]</code> is the zone guardian. <code>[&gt;]</code> is the unlocked exit.</p>
+      <p>Keyboard: arrow keys or WASD to move, Space or Enter to attack.</p>
+    </details>
+
+    <button id="resetButton" class="reset-button" type="button">Reset Save</button>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
