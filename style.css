@@ -244,7 +244,16 @@ h2 {
 }
 
 .move-button {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   font-size: 1.2rem;
+}
+
+.move-button.pressed {
+  border-color: var(--accent);
+  background: #334155;
+  transform: translateY(1px);
 }
 
 .move-button.up {
@@ -274,6 +283,10 @@ h2 {
   background: #4c1720;
   font-size: 1rem;
   font-weight: 700;
+}
+
+.attack-button:disabled {
+  opacity: 0.62;
 }
 
 .upgrade-panel {
