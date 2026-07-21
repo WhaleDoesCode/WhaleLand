@@ -1,0 +1,368 @@
+:root {
+  color-scheme: dark;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  background: #0b1020;
+  color: #f8fafc;
+  --panel: #111827;
+  --panel-2: #172033;
+  --border: #334155;
+  --accent: #38bdf8;
+  --danger: #fb7185;
+  --success: #4ade80;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #0b1020;
+  overscroll-behavior: none;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  touch-action: manipulation;
+}
+
+.shell {
+  width: min(100%, 760px);
+  margin: 0 auto;
+  padding: max(14px, env(safe-area-inset-top)) 12px max(22px, env(safe-area-inset-bottom));
+}
+
+.topbar,
+.stats,
+.progress-panel,
+.message-panel,
+.controls,
+.upgrade-panel,
+.help-panel {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 12px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.2rem;
+}
+
+h2 {
+  margin-bottom: 10px;
+  font-size: 1rem;
+}
+
+#zoneLabel {
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.small-button,
+.reset-button {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel-2);
+  padding: 9px 12px;
+}
+
+.small-button:active,
+.reset-button:active,
+.upgrade-button:active,
+.move-button:active,
+.attack-button:active {
+  transform: translateY(1px);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.stats div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 8px;
+  background: var(--panel-2);
+  text-align: center;
+}
+
+.stats span {
+  color: #94a3b8;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.stats strong {
+  overflow: hidden;
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+}
+
+.progress-panel {
+  margin-top: 10px;
+  padding: 11px 12px;
+}
+
+.progress-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+}
+
+#goalText {
+  color: #94a3b8;
+  text-align: right;
+}
+
+.progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #020617;
+}
+
+.progress-fill {
+  width: 0;
+  height: 100%;
+  background: var(--accent);
+  transition: width 140ms ease;
+}
+
+.game-wrap {
+  margin-top: 10px;
+  overflow: hidden;
+  border: 2px solid #475569;
+  border-radius: 12px;
+  background: #020617;
+}
+
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  width: 100%;
+  user-select: none;
+}
+
+.tile {
+  display: flex;
+  aspect-ratio: 1 / 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid #172033;
+  border-bottom: 1px solid #172033;
+  background: #0f172a;
+  font-size: clamp(0.62rem, 2.8vw, 1rem);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tile.wall {
+  background: #263244;
+  color: #64748b;
+}
+
+.tile.player {
+  background: #082f49;
+  color: #7dd3fc;
+}
+
+.tile.enemy {
+  background: #3f1722;
+  color: #fda4af;
+}
+
+.tile.guardian {
+  background: #4c1d0f;
+  color: #fdba74;
+}
+
+.tile.exit {
+  background: #13361f;
+  color: #86efac;
+}
+
+.tile.sword {
+  outline: 2px solid #f8fafc;
+  outline-offset: -3px;
+}
+
+.message-panel {
+  min-height: 48px;
+  margin-top: 10px;
+  padding: 11px 12px;
+  color: #cbd5e1;
+  font-size: 0.86rem;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 10px;
+  padding: 14px;
+}
+
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(50px, 1fr));
+  grid-template-rows: repeat(3, 52px);
+  gap: 5px;
+}
+
+.move-button,
+.attack-button {
+  border: 1px solid #475569;
+  border-radius: 10px;
+  background: #1e293b;
+}
+
+.move-button {
+  font-size: 1.2rem;
+}
+
+.move-button.up {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.move-button.left {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.move-button.down {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.move-button.right {
+  grid-column: 3;
+  grid-row: 2;
+}
+
+.attack-button {
+  min-height: 110px;
+  align-self: center;
+  border-color: #7f1d1d;
+  background: #4c1720;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.upgrade-panel {
+  margin-top: 10px;
+  padding: 12px;
+}
+
+.upgrade-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.upgrade-button {
+  display: flex;
+  min-height: 70px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+  padding: 9px 6px;
+}
+
+.upgrade-button span {
+  font-weight: 700;
+}
+
+.upgrade-button strong {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.upgrade-button:disabled {
+  opacity: 0.5;
+}
+
+.help-panel {
+  margin-top: 10px;
+  padding: 11px 12px;
+  color: #cbd5e1;
+  font-size: 0.82rem;
+}
+
+.help-panel summary {
+  cursor: pointer;
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.help-panel p {
+  margin-top: 9px;
+  line-height: 1.45;
+}
+
+code {
+  color: #7dd3fc;
+}
+
+.reset-button {
+  display: block;
+  margin: 12px auto 0;
+  border-color: #7f1d1d;
+  color: #fda4af;
+}
+
+@media (max-width: 520px) {
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .controls {
+    grid-template-columns: 1.25fr 0.75fr;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .dpad {
+    grid-template-columns: repeat(3, minmax(42px, 1fr));
+    grid-template-rows: repeat(3, 48px);
+  }
+
+  .upgrade-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .upgrade-button {
+    min-height: 54px;
+  }
+}
